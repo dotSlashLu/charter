@@ -1,0 +1,40 @@
+# macOS
+.DS_Store
+
+# Python bytecode / caches
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Virtual environments
+.venv/
+venv/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# IDE/editor
+.idea/
+.vscode/
+
+# Local runtime files
+*.log
+.env
+.env.*
+
+# Charter local config (may contain API key)
+charter.toml
+
+# Generated outputs / temporary Excel files
+*_analysis.xlsx
+test_*.xlsx
