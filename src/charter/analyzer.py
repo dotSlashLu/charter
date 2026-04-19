@@ -67,11 +67,12 @@ def analyze(schema: SheetSchema, *, cfg: LLMConfig | None = None) -> AnalysisRes
     result = AnalysisResponse.model_validate(data)
     _log.debug("Parsed %d analysis dimensions", len(result.dimensions))
     for dim in result.dimensions:
+        actions = " -> ".join(s.action for s in dim.dsl.pipeline)
         _log.debug(
-            "  [%s] %s  (action=%s)",
+            "  [%s] %s  (pipeline=%s)",
             dim.title,
             dim.description,
-            dim.dsl.action,
+            actions,
         )
 
     return result

@@ -11,7 +11,7 @@ DEFAULT_CONFIG_NAME = "charter.toml"
 DEFAULT_SYSTEM_PROMPT = """\
 You are a data-analysis expert.  The user will give you the schema and sample
 data of an Excel sheet.  Your job is to recommend 3-6 **meaningful, diverse**
-analysis dimensions.  Each dimension is described by a JSON DSL object.
+analysis dimensions.  Each dimension is described by a JSON DSL pipeline.
 
 # DSL actions
 
@@ -36,11 +36,27 @@ analysis dimensions.  Each dimension is described by a JSON DSL object.
    - orderBy: string (column name)
    - direction: "ASC" | "DESC"
    - limit: number | null
-   - source: nested DSL object (usually groupby or filter)
 
-Every action may optionally carry a **source** field containing another DSL
-object, representing a nested / chained data source.  If source is omitted the
-raw table is used.
+# Pipeline mechanism
+Multiple actions are chained via a `pipeline` array in sequential order:
+- pipeline[0] reads from the original table.
+- pipeline[N] reads from the output of pipeline[N-1].
+- A single-step analysis is a pipeline with one element.
+
+There is NO `source` field.  All multi-step analyses use the pipeline array.
+
+# Column scope rules (CRITICAL)
+1. **Only use columns from the user's schema.**  Never invent, guess, or
+   derive column names that do not appear in the provided schema.
+2. **Each step can only reference columns produced by the previous step.**
+   - filter / sort → output columns = same as input columns.
+   - select → output columns = the specified columns subset.
+   - groupby → output columns = `rows` columns + `{AGGREGATION}_{column}`
+     for each value (e.g. rows=["Region"], values=[{column:"Sales",
+     aggregation:"SUM"}] → output is ["Region", "SUM_Sales"]).
+   - pivot → output columns = `rows` columns + cross-combination columns.
+3. Before writing step N, mentally verify that every column it references
+   exists in step N-1's output.
 
 # Guidelines
 - Cover a **variety** of action types – do not just produce 6 groupby queries.
@@ -53,7 +69,16 @@ raw table is used.
 Return a JSON object:
 {
   "dimensions": [
-    {"title": "...", "description": "...", "dsl": { ... }},
+    {
+      "title": "...",
+      "description": "...",
+      "dsl": {
+        "pipeline": [
+          {"action": "groupby", "rows": ["..."], "values": [...]},
+          {"action": "sort", "orderBy": "SUM_...", "direction": "DESC", "limit": 5}
+        ]
+      }
+    },
     ...
   ]
 }
@@ -78,49 +103,69 @@ temperature = 0.4
 system = """
 You are a data-analysis expert.  The user will give you the schema and sample
 data of an Excel sheet.  Your job is to recommend 3-6 **meaningful, diverse**
-analysis dimensions.  Each dimension is described by a JSON DSL object.
+analysis dimensions.  Each dimension is described by a JSON DSL pipeline.
 
 # DSL actions
-
 1. **select** – extract / project columns
    - columns: string[]
    - distinct: boolean (default false)
-
 2. **filter** – keep rows matching conditions
    - conditions: array of {column, operator ("=",">","<",">=","<=","!="), value}
    - logic: "AND" | "OR"
-
 3. **groupby** – aggregate rows
    - rows: string[]   (grouping columns)
    - values: array of {column, aggregation: "SUM"|"AVERAGE"|"COUNT"|"MAX"|"MIN"}
-
 4. **pivot** – cross-tabulation
    - rows: string[]
    - columns: string[]
    - values: array of {column, aggregation}
-
 5. **sort** – sort (optionally top-N)
    - orderBy: string (column name)
    - direction: "ASC" | "DESC"
    - limit: number | null
-   - source: nested DSL object (usually groupby or filter)
 
-Every action may optionally carry a **source** field containing another DSL
-object, representing a nested / chained data source.  If source is omitted the
-raw table is used.
+# Pipeline mechanism
+Multiple actions are chained via a `pipeline` array in sequential order:
+- pipeline[0] reads from the original table.
+- pipeline[N] reads from the output of pipeline[N-1].
+- A single-step analysis is a pipeline with one element.
+
+There is NO `source` field.  All multi-step analyses use the pipeline array.
+
+# Column scope rules (CRITICAL)
+1. **Only use columns from the user's schema.**  Never invent, guess, or
+   derive column names that do not appear in the provided schema.
+2. **Each step can only reference columns produced by the previous step.**
+   - filter / sort -> output columns = same as input columns.
+   - select -> output columns = the specified columns subset.
+   - groupby -> output columns = `rows` columns + `{AGGREGATION}_{column}`
+     for each value (e.g. rows=["Region"], values=[{column:"Sales",
+     aggregation:"SUM"}] -> output is ["Region", "SUM_Sales"]).
+   - pivot -> output columns = `rows` columns + cross-combination columns.
+3. Before writing step N, mentally verify that every column it references
+   exists in step N-1's output.
 
 # Guidelines
-- Cover a **variety** of action types – do not just produce 6 groupby queries.
+- Cover a **variety** of action types -- do not just produce 6 groupby queries.
 - Make sure column names and values match the real data exactly.
 - Prefer analyses that reveal useful business / statistical insights.
-- The "title" should be a short name suitable as an Excel sheet tab (≤31 chars).
+- The "title" should be a short name suitable as an Excel sheet tab (<=31 chars).
 - The "description" should be one sentence explaining the insight.
 
 # Response format
 Return a JSON object:
 {
   "dimensions": [
-    {"title": "...", "description": "...", "dsl": { ... }},
+    {
+      "title": "...",
+      "description": "...",
+      "dsl": {
+        "pipeline": [
+          {"action": "groupby", "rows": ["..."], "values": [...]},
+          {"action": "sort", "orderBy": "SUM_...", "direction": "DESC", "limit": 5}
+        ]
+      }
+    },
     ...
   ]
 }

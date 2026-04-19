@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Literal, Union
+from typing import Annotated, Any, Literal, Union
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 # ---------------------------------------------------------------------------
@@ -23,28 +23,25 @@ class AggregationValue(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Action models – each carries an optional `source` for nesting
+# Action models — no `source` field; sequencing is handled by the pipeline
 # ---------------------------------------------------------------------------
 
 class SelectAction(BaseModel):
     action: Literal["select"]
     columns: list[str]
     distinct: bool = False
-    source: AnyAction | None = None
 
 
 class FilterAction(BaseModel):
     action: Literal["filter"]
     conditions: list[FilterCondition]
     logic: Literal["AND", "OR"] = "AND"
-    source: AnyAction | None = None
 
 
 class GroupByAction(BaseModel):
     action: Literal["groupby"]
     rows: list[str]
     values: list[AggregationValue]
-    source: AnyAction | None = None
 
 
 class PivotAction(BaseModel):
@@ -52,7 +49,6 @@ class PivotAction(BaseModel):
     rows: list[str]
     columns: list[str]
     values: list[AggregationValue]
-    source: AnyAction | None = None
 
 
 class SortAction(BaseModel):
@@ -60,7 +56,6 @@ class SortAction(BaseModel):
     order_by: str = Field(alias="orderBy")
     direction: Literal["ASC", "DESC"] = "ASC"
     limit: int | None = None
-    source: AnyAction | None = None
 
     model_config = {"populate_by_name": True}
 
@@ -74,12 +69,26 @@ AnyAction = Annotated[
     Field(discriminator="action"),
 ]
 
-# Rebuild forward-ref models now that AnyAction is defined.
-SelectAction.model_rebuild()
-FilterAction.model_rebuild()
-GroupByAction.model_rebuild()
-PivotAction.model_rebuild()
-SortAction.model_rebuild()
+
+# ---------------------------------------------------------------------------
+# Pipeline wrapper
+# ---------------------------------------------------------------------------
+
+class DSLSpec(BaseModel):
+    """A sequential pipeline of actions.
+
+    Accepts either ``{"pipeline": [...]}`` or a bare action dict like
+    ``{"action": "groupby", ...}`` (auto-wrapped into a length-1 pipeline).
+    """
+
+    pipeline: list[AnyAction] = Field(min_length=1)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _wrap_bare_action(cls, data: Any) -> Any:
+        if isinstance(data, dict) and "action" in data and "pipeline" not in data:
+            return {"pipeline": [data]}
+        return data
 
 
 # ---------------------------------------------------------------------------
@@ -89,7 +98,7 @@ SortAction.model_rebuild()
 class AnalysisDimension(BaseModel):
     title: str
     description: str
-    dsl: AnyAction
+    dsl: DSLSpec
 
 
 class AnalysisResponse(BaseModel):

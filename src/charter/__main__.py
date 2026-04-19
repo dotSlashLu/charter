@@ -111,12 +111,9 @@ def main(
     # --- 3. Display generated DSL for each dimension in debug mode ---
     if debug:
         for dim in response.dimensions:
+            dsl_json = dim.dsl.model_dump_json(indent=2, by_alias=True)
             console.print(
-                Panel(
-                    dim.dsl.model_dump_json(indent=2, by_alias=True),
-                    title=f"DSL: {dim.title}",
-                    border_style="yellow",
-                )
+                Panel(dsl_json, title=f"DSL: {dim.title}", border_style="yellow")
             )
 
     # --- 4. Let user confirm ---
@@ -156,7 +153,8 @@ def _display_dimensions(dims: list[AnalysisDimension]) -> None:
     table.add_column("Description")
 
     for i, dim in enumerate(dims, start=1):
-        table.add_row(str(i), dim.title, dim.dsl.action, dim.description)
+        actions = " -> ".join(s.action for s in dim.dsl.pipeline)
+        table.add_row(str(i), dim.title, actions, dim.description)
 
     console.print(table)
 
