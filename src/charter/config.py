@@ -1,4 +1,4 @@
-"""Configuration management – reads charter.toml for API keys, base URL, model, and prompt."""
+"""Configuration management for charter.toml LLM settings."""
 
 from __future__ import annotations
 
@@ -95,6 +95,10 @@ DEFAULT_CONFIG_TOML = '''\
 # OpenAI-compatible API settings
 # api_key = "sk-..."          # or set OPENAI_API_KEY env var
 # base_url = "https://api.openai.com/v1"  # change for compatible providers
+# Optional custom HTTP headers for provider-specific auth/routing:
+# [llm.headers]
+# "X-Provider-Project" = "project-id"
+# "HTTP-Referer" = "https://your-app.example"
 model = "gpt-4o"
 temperature = 0.4
 
@@ -177,6 +181,7 @@ Return a JSON object:
 class LLMConfig:
     api_key: str | None
     base_url: str | None
+    headers: dict[str, str]
     model: str
     temperature: float
     system_prompt: str
@@ -207,6 +212,7 @@ def load_config(path: str | Path | None = None) -> LLMConfig:
     return LLMConfig(
         api_key=llm.get("api_key"),
         base_url=llm.get("base_url"),
+        headers=_coerce_headers(llm.get("headers")),
         model=llm.get("model", "gpt-4o"),
         temperature=llm.get("temperature", 0.4),
         system_prompt=prompt_section.get("system", DEFAULT_SYSTEM_PROMPT).strip(),
@@ -237,3 +243,20 @@ def _resolve_path(explicit: str | Path | None) -> Path | None:
         return xdg
 
     return None
+
+
+def _coerce_headers(raw_headers: object) -> dict[str, str]:
+    """Normalise ``[llm.headers]`` config into ``dict[str, str]``."""
+    if raw_headers is None:
+        return {}
+    if not isinstance(raw_headers, dict):
+        raise TypeError(
+            "Invalid config: [llm.headers] must be a TOML table of key/value pairs."
+        )
+
+    headers: dict[str, str] = {}
+    for key, value in raw_headers.items():
+        if not isinstance(key, str):
+            raise TypeError("Invalid config: [llm.headers] keys must be strings.")
+        headers[key] = str(value)
+    return headers

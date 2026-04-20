@@ -24,12 +24,15 @@ def analyze(schema: SheetSchema, *, cfg: LLMConfig | None = None) -> AnalysisRes
         client_kwargs["api_key"] = cfg.api_key
     if cfg.base_url:
         client_kwargs["base_url"] = cfg.base_url
+    if cfg.headers:
+        client_kwargs["default_headers"] = cfg.headers
 
     _log.debug(
-        "Creating OpenAI client  model=%s  base_url=%s  api_key=%s",
+        "Creating OpenAI client  model=%s  base_url=%s  api_key=%s  headers=%s",
         cfg.model,
         cfg.base_url or "(default)",
         "***" + cfg.api_key[-4:] if cfg.api_key else "(env)",
+        list(cfg.headers.keys()) if cfg.headers else "[]",
     )
     client = OpenAI(**client_kwargs)
 
