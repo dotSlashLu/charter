@@ -617,7 +617,10 @@ def _agg_formula(
     for dim, val in zip(dim_names, key_values):
         parts.append(f"{src.range(dim)},{_formula_literal(val)}")
     parts.extend(extra)
-    return f"={fn}({','.join(parts)})"
+    formula_body = f"{fn}({','.join(parts)})"
+    if extra:
+        return f"=IFERROR({formula_body},\"\")"
+    return f"={formula_body}"
 
 
 def _pivot_formula(
@@ -642,7 +645,10 @@ def _pivot_formula(
     if fn == "COUNTIFS":
         return f"={fn}({','.join(criteria_parts)})"
 
-    return f"={fn}({val_range},{','.join(criteria_parts)})"
+    formula_body = f"{fn}({val_range},{','.join(criteria_parts)})"
+    if extra:
+        return f"=IFERROR({formula_body},\"\")"
+    return f"={formula_body}"
 
 
 def _unique_values(
